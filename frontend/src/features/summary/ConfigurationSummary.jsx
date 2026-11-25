@@ -1,57 +1,90 @@
 "use client";
 
-import { useState } from "react";
-
+import { useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import {
-    X,
     Box,
-    CheckCircle2,
-    Settings2,
+    Check,
+    SlidersHorizontal,
     Smartphone,
     Share2,
     LoaderCircle,
     Copy,
-    Check,
     ExternalLink,
-    ClipboardList,
 } from "lucide-react";
 
 import { ACCESSORIES } from "@/config/showroomConfig";
+import { useConfigurationStore } from "@/stores/useConfigurationStore";
+import { saveConfiguration } from "@/services/configurationService";
+import AccessoryThumbnail, {
+    BaseModelThumbnail,
+} from "@/features/configurator/AccessoryThumbnail";
 
-import { useConfigurationStore } from
-    "@/stores/useConfigurationStore";
-
-import { saveConfiguration } from
-    "@/services/configurationService";
+gsap.registerPlugin(useGSAP);
 
 export default function ConfigurationSummary({
     product,
     onViewInAR,
     isPreparingAR = false,
 }) {
+    const panelRef = useRef(null);
+
     const [isSaving, setIsSaving] = useState(false);
     const [sharedURL, setSharedURL] = useState("");
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState("");
 
-    const isSummaryOpen = useConfigurationStore(
-        (state) => state.isSummaryOpen
-    );
-
-    const configuredProductId = useConfigurationStore(
-        (state) => state.productId
-    );
-
+    const isSummaryOpen = useConfigurationStore((state) => state.isSummaryOpen);
+    const configuredProductId = useConfigurationStore((state) => state.productId);
     const selectedAccessories = useConfigurationStore(
         (state) => state.selectedAccessories
     );
-
-    const closeSummary = useConfigurationStore(
-        (state) => state.closeSummary
-    );
-
     const initializeConfiguration = useConfigurationStore(
         (state) => state.initializeConfiguration
+    );
+
+    useGSAP(
+        () => {
+            if (!isSummaryOpen || !panelRef.current) return;
+
+            const reducedMotion =
+                typeof window !== "undefined" &&
+                window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+            if (reducedMotion) {
+                gsap.set([panelRef.current, "[data-summary-item]"], {
+                    autoAlpha: 1,
+                    x: 0,
+                    y: 0,
+                });
+                return;
+            }
+
+            const tl = gsap.timeline();
+
+            tl.fromTo(
+                panelRef.current,
+                { autoAlpha: 0, x: 24 },
+                { autoAlpha: 1, x: 0, duration: 0.45, ease: "power3.out" }
+            ).fromTo(
+                "[data-summary-item]",
+                { autoAlpha: 0, y: 10 },
+                {
+                    autoAlpha: 1,
+                    y: 0,
+                    duration: 0.35,
+                    stagger: 0.05,
+                    ease: "power2.out",
+                },
+                0.14
+            );
+
+            return () => {
+                tl.kill();
+            };
+        },
+        { scope: panelRef, dependencies: [isSummaryOpen] }
     );
 
     if (!isSummaryOpen || !product) {
@@ -59,13 +92,10 @@ export default function ConfigurationSummary({
     }
 
     const accessoryIds =
-        configuredProductId === product.id
-            ? selectedAccessories
-            : [];
+        configuredProductId === product.id ? selectedAccessories : [];
 
-    const configuredAccessories = ACCESSORIES.filter(
-        (accessory) =>
-            accessoryIds.includes(accessory.id)
+    const configuredAccessories = ACCESSORIES.filter((accessory) =>
+        accessoryIds.includes(accessory.id)
     );
 
     const accessoryCount = configuredAccessories.length;
@@ -79,22 +109,15 @@ export default function ConfigurationSummary({
         setCopied(false);
 
         try {
-            const configuration =
-                await saveConfiguration(
-                    product.id,
-                    accessoryIds
-                );
+            const configuration = await saveConfiguration(
+                product.id,
+                accessoryIds
+            );
 
             setSharedURL(configuration.shareURL);
-        } catch (error) {
-            console.error(
-                "Configuration saving failed:",
-                error
-            );
-
-            setError(
-                "Unable to save configuration. Please try again."
-            );
+        } catch (err) {
+            console.error("Configuration saving failed:", err);
+            setError("Unable to save configuration. Please try again.");
         } finally {
             setIsSaving(false);
         }
@@ -102,10 +125,7 @@ export default function ConfigurationSummary({
 
     async function handleCopy() {
         try {
-            await navigator.clipboard.writeText(
-                sharedURL
-            );
-
+            await navigator.clipboard.writeText(sharedURL);
             setCopied(true);
             setError("");
         } catch {
@@ -117,168 +137,121 @@ export default function ConfigurationSummary({
 
     return (
         <aside
+            ref={panelRef}
+            aria-label="Configuration summary"
             className="
                 pointer-events-auto absolute
-                right-5 top-40 bottom-5 z-40
-                flex w-[calc(100%-2.5rem)]
-                flex-col overflow-hidden
-                rounded-2xl border border-gray-200
-                bg-white/95 shadow-xl
+                inset-x-4 bottom-3 z-30
+                flex max-h-[52dvh] flex-col overflow-hidden
+                rounded-[22px] border border-gray-100
+                bg-white/95 shadow-[0_18px_50px_rgba(15,23,42,0.1)]
                 backdrop-blur-xl
-                sm:w-[360px]
+                md:inset-x-auto md:bottom-6 md:right-8 md:top-24
+                md:max-h-none md:w-[440px]
+                lg:right-12 lg:w-[490px]
             "
         >
             {/* Header */}
-            <div className="border-b border-gray-100 p-5">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <ClipboardList
-                            size={19}
-                            className="text-primary"
-                        />
+            <div className="px-6 pb-3 pt-6">
+                <div className="flex items-start gap-3">
+                    <Box
+                        size={22}
+                        strokeWidth={1.9}
+                        className="mt-0.5 shrink-0 text-[#d71920]"
+                    />
 
-                        <span className="text-xs font-semibold tracking-wider text-primary">
+                    <div>
+                        <h2 className="text-sm font-bold uppercase tracking-[0.06em] text-[#d71920]">
                             CONFIGURATION SUMMARY
-                        </span>
+                        </h2>
+
+                        <p className="mt-0.5 text-xs text-gray-500">
+                            Review your selected product and accessories.
+                        </p>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={closeSummary}
-                        disabled={isSaving || isPreparingAR}
-                        aria-label="Close summary"
-                        className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
-                    >
-                        <X size={20} />
-                    </button>
                 </div>
-
-                <h2 className="mt-3 text-xl font-semibold text-gray-900">
-                    Your Configuration
-                </h2>
-
-                <p className="mt-1 text-xs text-gray-500">
-                    Review your selected product and accessories.
-                </p>
             </div>
 
             {/* Scrollable summary content */}
-            <div className="flex-1 space-y-6 overflow-y-auto p-5">
-
-                {/* Base printer */}
-                <section>
-                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-2">
+                {/* Base product */}
+                <section data-summary-item>
+                    <h3 className="mb-2.5 border-l-[2.5px] border-[#d71920] pl-2 text-xs font-bold text-[#152336]">
                         Base Product
                     </h3>
 
-                    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white">
-                            <Box
-                                size={23}
-                                className="text-gray-500"
-                            />
-                        </div>
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[#fdf0f1] px-4 py-3">
+                        <BaseModelThumbnail />
 
                         <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-gray-900">
+                            <p className="text-sm font-bold text-[#152336]">
                                 {product.name}
                             </p>
 
-                            <p className="mt-1 text-xs text-gray-500">
-                                Base Configuration
+                            <p className="mt-0.5 text-xs text-gray-600">
+                                {product.description ||
+                                    "Multi-function industrial printer base unit."}
                             </p>
                         </div>
-
-                        <CheckCircle2
-                            size={18}
-                            className="shrink-0 text-green-600"
-                        />
                     </div>
                 </section>
 
                 {/* Selected accessories */}
-                <section>
-                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <section data-summary-item>
+                    <h3 className="mb-2.5 border-l-[2.5px] border-[#d71920] pl-2 text-xs font-bold text-[#152336]">
                         Selected Accessories ({accessoryCount})
                     </h3>
 
                     {accessoryCount === 0 ? (
                         <div className="rounded-xl border border-dashed border-gray-200 p-5 text-center">
                             <Box
-                                size={25}
+                                size={22}
                                 className="mx-auto text-gray-400"
                             />
-
                             <p className="mt-2 text-xs text-gray-500">
                                 No accessories selected.
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-2">
-                            {configuredAccessories.map(
-                                (accessory) => (
-                                    <div
-                                        key={accessory.id}
-                                        className="flex items-center gap-3 rounded-xl border border-gray-200 p-3"
+                        <div className="space-y-2.5">
+                            {configuredAccessories.map((accessory) => (
+                                <div
+                                    key={accessory.id}
+                                    data-summary-item
+                                    className="
+                                        flex items-center gap-3.5
+                                        rounded-xl border border-gray-200
+                                        bg-white px-4 py-2.5
+                                        shadow-[0_2px_8px_rgba(15,23,42,0.03)]
+                                    "
+                                >
+                                    <AccessoryThumbnail
+                                        accessoryId={accessory.id}
+                                    />
+
+                                    <p className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800">
+                                        {accessory.name}
+                                    </p>
+
+                                    <span
+                                        aria-label="Selected"
+                                        className="
+                                            flex h-5 w-5 shrink-0
+                                            items-center justify-center
+                                            rounded-full bg-[#22c55e] text-white
+                                        "
                                     >
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100">
-                                            <Box
-                                                size={18}
-                                                className="text-gray-500"
-                                            />
-                                        </div>
-
-                                        <p className="flex-1 text-sm font-medium text-gray-700">
-                                            {accessory.name}
-                                        </p>
-
-                                        <CheckCircle2
-                                            size={17}
-                                            className="shrink-0 text-green-600"
-                                        />
-                                    </div>
-                                )
-                            )}
+                                        <Check size={12} strokeWidth={3} />
+                                    </span>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </section>
 
-                {/* Total configuration */}
-                <section className="space-y-3 rounded-xl bg-gray-100 p-4">
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">
-                            Base Product
-                        </span>
-
-                        <span className="font-medium">
-                            1
-                        </span>
-                    </div>
-
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">
-                            Accessories
-                        </span>
-
-                        <span className="font-medium">
-                            {accessoryCount}
-                        </span>
-                    </div>
-
-                    <div className="border-t border-gray-200 pt-3">
-                        <div className="flex justify-between text-sm font-semibold">
-                            <span>Total Components</span>
-
-                            <span>
-                                {accessoryCount + 1}
-                            </span>
-                        </div>
-                    </div>
-                </section>
-
-                {/* Shareable link */}
+                {/* Shareable link after Save & Share */}
                 {sharedURL && (
-                    <section className="space-y-3 rounded-xl border border-gray-200 p-3">
+                    <section className="space-y-2.5 rounded-xl border border-gray-200 bg-gray-50/70 p-3.5">
                         <p className="text-xs font-semibold text-green-600">
                             Configuration link generated
                         </p>
@@ -288,21 +261,20 @@ export default function ConfigurationSummary({
                             readOnly
                             value={sharedURL}
                             aria-label="Configuration link"
-                            className="w-full rounded-lg border border-gray-200 bg-gray-50 p-2 text-xs text-gray-600"
+                            className="w-full rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600"
                         />
 
                         <div className="flex gap-2">
                             <button
                                 type="button"
                                 onClick={handleCopy}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 p-2 text-xs"
+                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white p-2 text-xs font-medium text-gray-700 hover:bg-gray-100"
                             >
                                 {copied ? (
-                                    <Check size={15} />
+                                    <Check size={14} />
                                 ) : (
-                                    <Copy size={15} />
+                                    <Copy size={14} />
                                 )}
-
                                 {copied ? "Copied" : "Copy"}
                             </button>
 
@@ -310,9 +282,9 @@ export default function ConfigurationSummary({
                                 href={sharedURL}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 p-2 text-xs"
+                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white p-2 text-xs font-medium text-gray-700 hover:bg-gray-100"
                             >
-                                <ExternalLink size={15} />
+                                <ExternalLink size={14} />
                                 Open
                             </a>
                         </div>
@@ -329,9 +301,8 @@ export default function ConfigurationSummary({
                 )}
             </div>
 
-            {/* Bottom actions */}
-            <div className="space-y-3 border-t border-gray-100 bg-white p-5">
-
+            {/* Bottom action buttons matching wireframe */}
+            <div className="grid grid-cols-1 gap-2.5 border-t border-gray-100 bg-white px-6 py-5 sm:grid-cols-3">
                 <button
                     type="button"
                     disabled={isSaving || isPreparingAR}
@@ -339,56 +310,63 @@ export default function ConfigurationSummary({
                         setSharedURL("");
                         setCopied(false);
                         setError("");
-
-                        initializeConfiguration(
-                            product.id
-                        );
+                        initializeConfiguration(product.id);
                     }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                    className="
+                        flex items-center justify-center gap-1.5
+                        rounded-xl border border-gray-200 bg-white
+                        px-3 py-2.5 text-xs font-medium text-gray-700
+                        transition-colors hover:bg-gray-50
+                        disabled:opacity-50
+                    "
                 >
-                    <Settings2 size={17} />
-
-                    Edit Configuration
+                    <SlidersHorizontal size={14} strokeWidth={1.9} />
+                    <span className="whitespace-nowrap">Edit Configuration</span>
                 </button>
 
                 <button
                     type="button"
                     onClick={onViewInAR}
                     disabled={isSaving || isPreparingAR}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+                    className="
+                        flex items-center justify-center gap-1.5
+                        rounded-xl bg-[#e01920] px-3 py-2.5
+                        text-xs font-medium text-white
+                        shadow-[0_8px_20px_-4px_rgba(224,25,32,0.45)]
+                        transition-colors hover:bg-[#c81218]
+                        disabled:opacity-50
+                    "
                 >
                     {isPreparingAR ? (
-                        <LoaderCircle
-                            size={17}
-                            className="animate-spin"
-                        />
+                        <LoaderCircle size={14} className="animate-spin" />
                     ) : (
-                        <Smartphone size={17} />
+                        <Smartphone size={14} strokeWidth={1.9} />
                     )}
-
-                    {isPreparingAR
-                        ? "Preparing AR..."
-                        : "View in AR"}
+                    <span className="whitespace-nowrap">
+                        {isPreparingAR ? "Preparing AR..." : "View in AR"}
+                    </span>
                 </button>
 
                 <button
                     type="button"
                     onClick={handleShare}
                     disabled={isSaving || isPreparingAR}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                    className="
+                        flex items-center justify-center gap-1.5
+                        rounded-xl border border-gray-200 bg-white
+                        px-3 py-2.5 text-xs font-medium text-gray-700
+                        transition-colors hover:bg-gray-50
+                        disabled:opacity-50
+                    "
                 >
                     {isSaving ? (
-                        <LoaderCircle
-                            size={17}
-                            className="animate-spin"
-                        />
+                        <LoaderCircle size={14} className="animate-spin" />
                     ) : (
-                        <Share2 size={17} />
+                        <Share2 size={14} strokeWidth={1.9} />
                     )}
-
-                    {isSaving
-                        ? "Saving Configuration..."
-                        : "Save & Share"}
+                    <span className="whitespace-nowrap">
+                        {isSaving ? "Saving..." : "Save & Share"}
+                    </span>
                 </button>
             </div>
         </aside>

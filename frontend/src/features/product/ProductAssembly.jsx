@@ -1,20 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useGLTF } from "@react-three/drei";
-
 import * as THREE from "three";
+import gsap from "gsap";
 
-import HotspotList from
-    "@/features/hotspots/HotspotList";
-
-import { prepareAssembly } from
-    "@/utils/modelUtils";
+import HotspotList from "@/features/hotspots/HotspotList";
+import { PRODUCT_LAYER, prepareAssembly, setObjectLayer } from "@/utils/modelUtils";
+import { useShowroomStore } from "@/stores/useShowroomStore";
 
 export default function ProductAssembly({
     product,
     accessories = [],
 }) {
+    const groupRef = useRef(null);
+    const prevPartCountRef = useRef(1);
+    const setAssemblySize = useShowroomStore((state) => state.setAssemblySize);
+
     const parts = useMemo(
         () => [
             {
@@ -29,16 +31,11 @@ export default function ProductAssembly({
         [product, accessories]
     );
 
-    const modelURLs = parts.map(
-        (part) => part.modelURL
-    );
-
+    const modelURLs = parts.map((part) => part.modelURL);
     const loadedModels = useGLTF(modelURLs);
 
-    const { model, baseBounds } = useMemo(() => {
-        const scenes = loadedModels.map(
-            (gltf) => gltf.scene
-        );
+    const { model, baseBounds, size } = useMemo(() => {
+        const scenes = loadedModels.map((gltf) => gltf.scene);
 
         const result = prepareAssembly(
             scenes,
@@ -48,37 +45,64 @@ export default function ProductAssembly({
         );
 
         result.model.updateMatrixWorld(true);
+        setObjectLayer(result.model, PRODUCT_LAYER);
 
-        // Retrieve the base printer from
-        // the prepared assembly hierarchy.
         const assembly = result.model.children[0];
-
         const basePart = assembly?.children[0];
 
         const baseBounds = basePart
-            ? new THREE.Box3().setFromObject(
-                basePart,
-                true
-            )
+            ? new THREE.Box3().setFromObject(basePart, true)
             : null;
 
         return {
             model: result.model,
             baseBounds,
+            size: result.size,
         };
     }, [loadedModels, parts, product]);
 
-    return (
-        <group>
-            <primitive
-                object={model}
-                dispose={null}
-            />
+    useEffect(() => {
+        setAssemblySize(size);
+    }, [size, setAssemblySize]);
 
-            <HotspotList
-                bounds={baseBounds}
-                productId={product.id}
-            />
+    // Smooth GSAP settle animation when accessories are added or removed (keeps y = 0 grounded)
+    useEffect(() => {
+        const group = groupRef.current;
+        if (!group) return;
+
+        if (prevPartCountRef.current === parts.length) {
+            return;
+        }
+        prevPartCountRef.current = parts.length;
+
+        const reducedMotion =
+            typeof window !== "undefined" &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (reducedMotion) return;
+
+        const tween = gsap.fromTo(
+            group.scale,
+            { x: 0.96, y: 0.96, z: 0.96 },
+            {
+                x: 1,
+                y: 1,
+                z: 1,
+                duration: 0.45,
+                ease: "power3.out",
+            }
+        );
+
+        return () => {
+            tween.kill();
+        };
+    }, [parts.length]);
+
+    return (
+        <group ref={groupRef} position={[0, 0, 0]}>
+            <primitive object={model} dispose={null} />
+
+            <HotspotList bounds={baseBounds} productId={product.id} />
         </group>
     );
 }
