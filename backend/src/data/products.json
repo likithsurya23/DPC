@@ -1,0 +1,27 @@
+[
+    {
+        "id": "base-tu11",
+        "name": "Base Model TU11",
+        "category": "Multifunction Printer",
+        "description": "Multi-function industrial printer base unit.",
+        "file": "products/Base-Model-TU11.glb",
+        "modelPath": "/assets/models/products/Base-Model-TU11.glb",
+        "rotation": [0, 0, 0],
+        "scale": 1,
+        "supportsHotspots": true,
+        "dimensions": {
+            "width": 0.603,
+            "height": 0.822,
+            "depth": 0.648,
+            "unit": "m"
+        },
+        "accessoryIds": [
+            "bp-tr12",
+            "bp-tr12-variant",
+            "finisher-fn15",
+            "large-capacitor-lc10",
+            "tray-de12"
+        ]
+    }
+]
+

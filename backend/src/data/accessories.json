@@ -1,0 +1,55 @@
+[
+    {
+        "id": "bp-tr12",
+        "name": "BP TR12",
+        "description": "Extended upper output exit tray for high-volume document separation.",
+        "file": "accessories/BP-TR12.glb",
+        "modelPath": "/assets/models/accessories/BP-TR12.glb",
+        "exclusiveGroup": "bp-tr12-group",
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": 1
+    },
+    {
+        "id": "bp-tr12-variant",
+        "name": "BP TR12 Variant",
+        "description": "Compact upper exit tray optimized for smaller office footprints.",
+        "file": "accessories/BP-TR12 1.glb",
+        "modelPath": "/assets/models/accessories/BP-TR12%201.glb",
+        "exclusiveGroup": "bp-tr12-group",
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": 1
+    },
+    {
+        "id": "finisher-fn15",
+        "name": "Finisher FN15",
+        "description": "Multi-tray floor-standing finisher with stapling and sorting support.",
+        "file": "accessories/Finisher-FN15.glb",
+        "modelPath": "/assets/models/accessories/Finisher-FN15.glb",
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": 1
+    },
+    {
+        "id": "large-capacitor-lc10",
+        "name": "Large Capacitor LC10",
+        "description": "Side high-capacity paper feed cabinet for continuous print runs.",
+        "file": "accessories/Large-Capacitor-LC10.glb",
+        "modelPath": "/assets/models/accessories/Large-Capacitor-LC10.glb",
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": 1
+    },
+    {
+        "id": "tray-de12",
+        "name": "Tray DE12",
+        "description": "Dual-drawer pedestal paper cassette unit supporting extra media sizes.",
+        "file": "accessories/TRAY-DE12.glb",
+        "modelPath": "/assets/models/accessories/TRAY-DE12.glb",
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": 1
+    }
+]
+

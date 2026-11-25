@@ -1,57 +1,43 @@
-export const AR_PRODUCTS = {
-    "base-tu11": {
-        id: "base-tu11",
-        name: "Base Model TU11",
-        file: "products/Base-Model-TU11.glb",
+import { readFileSync } from "node:fs";
 
-        rotation: [0, 0, 0],
-        scale: 1,
+const productsData = JSON.parse(
+    readFileSync(new URL("../data/products.json", import.meta.url), "utf-8")
+);
 
-        accessories: [
-            "bp-tr12",
-            "bp-tr12-variant",
-            "finisher-fn15",
-            "large-capacitor-lc10",
-            "tray-de12",
-        ],
-    },
-};
+const accessoriesData = JSON.parse(
+    readFileSync(new URL("../data/accessories.json", import.meta.url), "utf-8")
+);
 
-export const AR_ACCESSORIES = {
-    "bp-tr12": {
-        file: "accessories/BP-TR12.glb",
-        exclusiveGroup: "bp-tr12-group",
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: 1,
-    },
+export const CATALOG_PRODUCTS = productsData.map((product) => ({
+    ...product,
+    accessories: (product.accessoryIds || [])
+        .map((accId) => accessoriesData.find((acc) => acc.id === accId))
+        .filter(Boolean),
+}));
 
-    "bp-tr12-variant": {
-        file: "accessories/BP-TR12 1.glb",
-        exclusiveGroup: "bp-tr12-group",
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: 1,
-    },
+export const AR_PRODUCTS = Object.fromEntries(
+    productsData.map((product) => [
+        product.id,
+        {
+            id: product.id,
+            name: product.name,
+            file: product.file,
+            rotation: product.rotation || [0, 0, 0],
+            scale: product.scale ?? 1,
+            accessories: product.accessoryIds || [],
+        },
+    ])
+);
 
-    "finisher-fn15": {
-        file: "accessories/Finisher-FN15.glb",
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: 1,
-    },
-
-    "large-capacitor-lc10": {
-        file: "accessories/Large-Capacitor-LC10.glb",
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: 1,
-    },
-
-    "tray-de12": {
-        file: "accessories/TRAY-DE12.glb",
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: 1,
-    },
-};
+export const AR_ACCESSORIES = Object.fromEntries(
+    accessoriesData.map((accessory) => [
+        accessory.id,
+        {
+            file: accessory.file,
+            exclusiveGroup: accessory.exclusiveGroup,
+            position: accessory.position || [0, 0, 0],
+            rotation: accessory.rotation || [0, 0, 0],
+            scale: accessory.scale ?? 1,
+        },
+    ])
+);

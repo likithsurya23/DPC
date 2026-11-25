@@ -1,9 +1,8 @@
 import app from "./app.js";
+import { envConfig } from "./config/env.js";
 
-const PORT = Number(process.env.PORT || 5000);
-
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(envConfig.port, envConfig.host, () => {
     console.log(
-        `DPC Backend running at http://localhost:${PORT}`
+        `DPC Backend running on ${envConfig.host}:${envConfig.port}`
     );
 });
