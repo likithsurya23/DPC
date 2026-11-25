@@ -40,6 +40,7 @@ export async function prepareARConfiguration({
     const uniqueIds = [...new Set(accessoryIds)];
 
     const accessories = [];
+    const orderedAccessoryIds = [];
 
     const exclusiveGroups = new Set();
 
@@ -76,10 +77,11 @@ export async function prepareARConfiguration({
     for (const id of product.accessories) {
         if (uniqueIds.includes(id)) {
             accessories.push(AR_ACCESSORIES[id]);
+            orderedAccessoryIds.push(id);
         }
     }
 
-    return generateGLB(product, accessories);
+    return generateGLB(product, accessories, orderedAccessoryIds);
 }
 
 export async function getARConfiguration(id) {

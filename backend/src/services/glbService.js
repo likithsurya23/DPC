@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 
 import { Document, NodeIO } from "@gltf-transform/core";
@@ -16,6 +16,10 @@ import {
 } from "@gltf-transform/extensions";
 
 import { Euler, Quaternion } from "three";
+import {
+    convertGLTFDocumentToUSDZ,
+    writeUSDZFile,
+} from "./usdzService.js";
 
 const modelDirectory = fileURLToPath(
     new URL("../../assets/models/", import.meta.url)
@@ -26,6 +30,39 @@ const generatedDirectory = path.join(
     "generated",
     "glb"
 );
+
+const generatedUsdzDirectory = path.join(
+    modelDirectory,
+    "generated",
+    "usdz"
+);
+
+async function ensureUsdzExists(configurationId, glbPath, document = null) {
+    const usdzPath = path.join(
+        generatedUsdzDirectory,
+        `${configurationId}.usdz`
+    );
+
+    try {
+        await access(usdzPath);
+        return `/assets/models/generated/usdz/${configurationId}.usdz`;
+    } catch {
+        // Generate Quick Look-compatible USDZ from the configured GLB.
+    }
+
+    await mkdir(generatedUsdzDirectory, { recursive: true });
+
+    let sourceDoc = document;
+    if (!sourceDoc) {
+        const io = new NodeIO().registerExtensions(KHRONOS_EXTENSIONS);
+        sourceDoc = await io.read(glbPath);
+    }
+
+    const usdzBytes = convertGLTFDocumentToUSDZ(sourceDoc);
+    await writeUSDZFile(usdzPath, usdzBytes);
+
+    return `/assets/models/generated/usdz/${configurationId}.usdz`;
+}
 
 function applyTransform(node, part) {
     const rotation = new Quaternion().setFromEuler(
@@ -40,7 +77,7 @@ function applyTransform(node, part) {
     node.setScale([scale, scale, scale]);
 }
 
-export async function generateGLB(product, accessories) {
+export async function generateGLB(product, accessories, accessoryIds = []) {
     const io = new NodeIO().registerExtensions(
         KHRONOS_EXTENSIONS
     );
@@ -78,6 +115,10 @@ export async function generateGLB(product, accessories) {
         recursive: true,
     });
 
+    await mkdir(generatedUsdzDirectory, {
+        recursive: true,
+    });
+
     const outputPath = path.join(
         generatedDirectory,
         `${configurationId}.glb`
@@ -92,19 +133,35 @@ export async function generateGLB(product, accessories) {
         configurationId,
         productId: product.id,
         productName: product.name,
+        accessoryIds,
+        createdAt: new Date().toISOString(),
 
         modelURL:
             `/assets/models/generated/glb/${configurationId}.glb`,
+        iosURL:
+            `/assets/models/generated/usdz/${configurationId}.usdz`,
     };
 
     // Reuse a previously generated configuration.
     try {
-        await readFile(metadataPath);
-        await readFile(outputPath);
+        const existingContent = await readFile(metadataPath, "utf-8");
+        await access(outputPath);
 
-        return result;
+        const iosURL = await ensureUsdzExists(configurationId, outputPath);
+        const existingMetadata = JSON.parse(existingContent);
+        const merged = {
+            ...existingMetadata,
+            accessoryIds: existingMetadata.accessoryIds || accessoryIds,
+            iosURL: existingMetadata.iosURL || iosURL,
+        };
+
+        if (!existingMetadata.iosURL) {
+            await writeFile(metadataPath, JSON.stringify(merged));
+        }
+
+        return merged;
     } catch {
-        // Generate the GLB if it does not exist.
+        // Generate the GLB if it does not exist or metadata is incomplete.
     }
 
     const document = new Document();
@@ -168,15 +225,22 @@ export async function generateGLB(product, accessories) {
         center({ pivot: "below" })
     );
 
+    const usdzBytes = convertGLTFDocumentToUSDZ(document);
     const binary = await io.writeBinary(document);
 
     const temporaryPath =
         `${outputPath}.${randomUUID()}.tmp`;
+    const usdzPath = path.join(
+        generatedUsdzDirectory,
+        `${configurationId}.usdz`
+    );
 
     try {
         await writeFile(temporaryPath, binary);
 
         await rename(temporaryPath, outputPath);
+
+        await writeUSDZFile(usdzPath, usdzBytes);
 
         await writeFile(
             metadataPath,
@@ -191,18 +255,32 @@ export async function generateGLB(product, accessories) {
 
 export async function getGeneratedConfiguration(id) {
     if (!/^[a-f0-9]{64}$/.test(id)) {
+        console.warn("[GLB] Rejected malformed configuration ID:", { id });
         return null;
     }
 
-    try {
-        const content = await readFile(
-            path.join(generatedDirectory, `${id}.json`),
-            "utf-8"
-        );
+    const metadataPath = path.join(generatedDirectory, `${id}.json`);
+    const glbPath = path.join(generatedDirectory, `${id}.glb`);
 
-        return JSON.parse(content);
+    try {
+        const content = await readFile(metadataPath, "utf-8");
+        await access(glbPath);
+
+        const metadata = JSON.parse(content);
+        const iosURL = await ensureUsdzExists(id, glbPath);
+
+        if (!metadata.iosURL) {
+            metadata.iosURL = iosURL;
+            await writeFile(metadataPath, JSON.stringify(metadata));
+        }
+
+        return metadata;
     } catch (error) {
         if (error.code === "ENOENT") {
+            console.warn("[GLB] Persisted AR asset missing on disk:", {
+                id,
+                missingPath: error.path,
+            });
             return null;
         }
 

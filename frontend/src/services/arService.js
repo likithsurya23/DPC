@@ -2,42 +2,75 @@ import { apiRequest } from "./api";
 import { getAssetURL } from "@/config/apiConfig";
 
 export async function prepareAR(productId, accessoryIds = []) {
-    const response = await apiRequest("/ar/prepare", {
-        method: "POST",
+    try {
+        const response = await apiRequest("/ar/prepare", {
+            method: "POST",
 
-        headers: {
-            "Content-Type": "application/json",
-        },
+            headers: {
+                "Content-Type": "application/json",
+            },
 
-        body: JSON.stringify({
+            body: JSON.stringify({
+                productId,
+                accessoryIds,
+            }),
+        });
+
+        if (!response?.data?.configurationId) {
+            throw new Error("Backend returned an invalid AR configuration.");
+        }
+
+        return response.data;
+    } catch (error) {
+        console.error("[AR] Failed to prepare AR configuration:", {
             productId,
             accessoryIds,
-        }),
-    });
-
-    return response.data;
+            status: error?.status ?? null,
+            message: error?.message ?? String(error),
+        });
+        throw error;
+    }
 }
 
 export async function getARConfiguration(
     configurationId,
     { signal } = {}
 ) {
-    const response = await apiRequest(
-        `/ar/${encodeURIComponent(configurationId)}`,
-        { signal }
-    );
+    if (!configurationId) {
+        throw new Error("Missing AR configuration ID.");
+    }
 
-    const configuration = response.data;
+    try {
+        const response = await apiRequest(
+            `/ar/${encodeURIComponent(configurationId)}`,
+            { signal }
+        );
 
-    return {
-        ...configuration,
+        const configuration = response?.data;
 
-        modelURL: getAssetURL(
-            configuration.modelURL
-        ),
+        if (!configuration?.modelURL) {
+            throw new Error("AR configuration is missing a 3D model URL.");
+        }
 
-        iosURL: configuration.iosURL
-            ? getAssetURL(configuration.iosURL)
-            : null,
-    };
+        return {
+            ...configuration,
+
+            modelURL: getAssetURL(
+                configuration.modelURL
+            ),
+
+            iosURL: configuration.iosURL
+                ? getAssetURL(configuration.iosURL)
+                : null,
+        };
+    } catch (error) {
+        if (error?.name !== "AbortError") {
+            console.error("[AR] Failed to retrieve AR configuration:", {
+                configurationId,
+                status: error?.status ?? null,
+                message: error?.message ?? String(error),
+            });
+        }
+        throw error;
+    }
 }
