@@ -1,0 +1,62 @@
+[
+    {
+        "id": "touchscreen-display",
+        "number": 1,
+        "title": "Smart Touchscreen Display",
+        "description": "10.1-inch tiltable capacitive touchscreen with an intuitive smartphone-style user interface, easy navigation, and customizable quick-access shortcuts.",
+        "anchor": [
+            0.72,
+            0.82,
+            0.88
+        ],
+        "videoURL": null
+    },
+    {
+        "id": "document-feeder",
+        "number": 2,
+        "title": "Duplexing Document Feeder",
+        "description": "High-capacity single-pass duplexing document feeder (DSPF) capable of rapid two-sided scanning with multi-feed detection.",
+        "anchor": [
+            0.5,
+            0.98,
+            0.5
+        ],
+        "videoURL": null
+    },
+    {
+        "id": "output-tray",
+        "number": 3,
+        "title": "Internal Output Tray",
+        "description": "Central output paper delivery area with integrated paper sensor, sorting capability, and LED notification indicators.",
+        "anchor": [
+            0.32,
+            0.72,
+            0.65
+        ],
+        "videoURL": null
+    },
+    {
+        "id": "toner-compartment",
+        "number": 4,
+        "title": "Front Toner Access Panel",
+        "description": "Ergonomic front-opening compartment for fast, mess-free toner cartridge replacement with automatic cartridge locking.",
+        "anchor": [
+            0.5,
+            0.58,
+            0.95
+        ],
+        "videoURL": null
+    },
+    {
+        "id": "paper-drawers",
+        "number": 5,
+        "title": "Universal Paper Cassettes",
+        "description": "High-capacity dual paper cassettes supporting a wide range of media weights and custom document formats.",
+        "anchor": [
+            0.5,
+            0.28,
+            0.9
+        ],
+        "videoURL": null
+    }
+]
