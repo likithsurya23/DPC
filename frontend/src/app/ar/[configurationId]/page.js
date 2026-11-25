@@ -1,5 +1,13 @@
 import { Suspense } from "react";
+import { Montserrat } from "next/font/google";
+
 import ARViewer from "@/features/ar/ARViewer";
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+});
 
 export const metadata = {
   title: "Augmented Reality",
@@ -11,6 +19,7 @@ async function ARViewerWithParams({ params }) {
   return (
     <ARViewer
       configurationId={configurationId}
+      fontClassName={montserrat.className}
     />
   );
 }
