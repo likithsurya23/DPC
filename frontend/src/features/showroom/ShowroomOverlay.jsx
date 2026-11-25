@@ -1,5 +1,10 @@
 "use client";
 
+import { useCallback, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import {
     ArrowLeft,
     ArrowRight,
@@ -8,50 +13,31 @@ import {
     RotateCcw,
     Rotate3D,
     MousePointer2,
-    LayoutGrid,
-    Settings2,
-    Scan,
-    ClipboardList,
-    Smartphone,
-    LoaderCircle,
+    Settings,
 } from "lucide-react";
 
-import ConfigurationSummary from
-    "@/features/summary/ConfigurationSummary";
-
-import ConfiguratorPanel from
-    "@/features/configurator/ConfiguratorPanel";
-
-import ProductDetails from
-    "@/features/product/ProductDetails";
-
-import { useConfigurationStore } from
-    "@/stores/useConfigurationStore";
-
-import HotspotDetails from
-    "@/features/hotspots/HotspotDetails";
-
-import Header from "@/components/layout/Header";
-import Navigation from "@/components/layout/Navigation";
-
+import ConfigurationSummary from "@/features/summary/ConfigurationSummary";
+import ConfiguratorPanel from "@/features/configurator/ConfiguratorPanel";
+import HotspotDetails from "@/features/hotspots/HotspotDetails";
 import ProductList from "@/features/catalogue/ProductList";
+import Navigation from "@/components/layout/Navigation";
+import BrandLogo from "@/components/layout/BrandLogo";
 
+import { APP_CONFIG } from "@/config/appConfig";
+import { useConfigurationStore } from "@/stores/useConfigurationStore";
 import { useProducts } from "@/hooks/useProducts";
 import { useProductStore } from "@/stores/useProductStore";
 import { useShowroomStore } from "@/stores/useShowroomStore";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-
 import { prepareAR } from "@/services/arService";
 
-function ControlButton({
+gsap.registerPlugin(useGSAP);
+
+function ProductControlButton({
     icon: Icon,
     label,
     onClick,
     active = false,
     pressed,
-    disabled = false,
 }) {
     return (
         <button
@@ -59,36 +45,35 @@ function ControlButton({
             title={label}
             aria-label={label}
             aria-pressed={pressed}
-            disabled={disabled}
             onClick={onClick}
             className={`
-                flex h-11 w-11
-                items-center justify-center
-                rounded-xl border shadow-sm
+                flex min-w-[66px] flex-col items-center justify-center gap-1
+                rounded-xl border px-3 py-2.5
+                shadow-[0_6px_18px_rgba(15,23,42,0.08)]
                 transition-colors
-                disabled:opacity-40
                 ${active
-                    ? "border-primary bg-primary text-white"
-                    : "border-gray-200 bg-white/95 text-gray-700 hover:bg-gray-100"
+                    ? "border-[#e01920] bg-[#e01920] text-white"
+                    : "border-gray-100 bg-white/95 text-gray-700 hover:bg-gray-50"
                 }
             `}
         >
-            <Icon size={19} strokeWidth={1.8} />
+            <Icon size={18} strokeWidth={1.8} />
+            <span className="text-[11px] font-medium leading-none">
+                {label}
+            </span>
         </button>
     );
 }
 
 export default function ShowroomOverlay() {
     const router = useRouter();
+    const overlayRef = useRef(null);
 
     const [isPreparingAR, setIsPreparingAR] = useState(false);
-
-    const [arError, setARError] = useState("");
 
     const configuredProductId = useConfigurationStore(
         (state) => state.productId
     );
-
     const selectedAccessories = useConfigurationStore(
         (state) => state.selectedAccessories
     );
@@ -99,6 +84,7 @@ export default function ShowroomOverlay() {
         selectedProduct,
         isTransitioning,
         autoRotate,
+        enterProduct,
         returnToShowroom,
         toggleAutoRotate,
         zoomIn,
@@ -106,13 +92,9 @@ export default function ShowroomOverlay() {
         resetCamera,
         showHotspots,
         selectedHotspot,
-        toggleHotspots,
         resetHotspots,
     } = useShowroomStore();
 
-    const isConfiguratorOpen = useConfigurationStore(
-        (state) => state.isConfiguratorOpen
-    );
     const initializeConfiguration = useConfigurationStore(
         (state) => state.initializeConfiguration
     );
@@ -123,31 +105,195 @@ export default function ShowroomOverlay() {
     const isSummaryOpen = useConfigurationStore(
         (state) => state.isSummaryOpen
     );
-
-    const openSummary = useConfigurationStore(
-        (state) => state.openSummary
-    );
-
     const closeSummary = useConfigurationStore(
         (state) => state.closeSummary
     );
 
-    const {
-        isCatalogueOpen,
-        toggleCatalogue,
-        openCatalogue,
-    } = useProductStore();
+    const { isCatalogueOpen } = useProductStore();
 
     const product =
-        products.find(
-            (item) => item.id === selectedProduct
-        ) || products[0];
+        products.find((item) => item.id === selectedProduct) || products[0];
+
+    // GSAP entrance animations for showroom and product configuration views
+    useGSAP(
+        () => {
+            const reducedMotion =
+                typeof window !== "undefined" &&
+                window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+            if (reducedMotion) {
+                gsap.set(
+                    [
+                        "[data-showroom-anim='header']",
+                        "[data-showroom-anim='eyebrow']",
+                        "[data-showroom-anim='line']",
+                        "[data-showroom-anim='heading']",
+                        "[data-showroom-anim='subtitle']",
+                        "[data-showroom-anim='cta']",
+                        "[data-product-anim='back']",
+                        "[data-product-anim='title']",
+                        "[data-product-anim='controls']",
+                        "[data-review-anim='eyebrow']",
+                        "[data-review-anim='line']",
+                    ],
+                    { autoAlpha: 1, y: 0, scaleX: 1, scale: 1 }
+                );
+                return;
+            }
+
+            const tl = gsap.timeline();
+
+            tl.fromTo(
+                "[data-showroom-anim='header']",
+                { autoAlpha: 0, y: -12 },
+                { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" },
+                0.08
+            );
+
+            if (mode === "showroom") {
+                tl.fromTo(
+                    "[data-showroom-anim='eyebrow']",
+                    { autoAlpha: 0, y: 12 },
+                    { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" },
+                    0.22
+                )
+                    .fromTo(
+                        "[data-showroom-anim='line']",
+                        { scaleX: 0, transformOrigin: "left center" },
+                        { scaleX: 1, duration: 0.45, ease: "power3.out" },
+                        0.32
+                    )
+                    .fromTo(
+                        "[data-showroom-anim='heading']",
+                        { autoAlpha: 0, y: 20 },
+                        { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" },
+                        0.38
+                    )
+                    .fromTo(
+                        "[data-showroom-anim='subtitle']",
+                        { autoAlpha: 0, y: 14 },
+                        { autoAlpha: 1, y: 0, duration: 0.55, ease: "power2.out" },
+                        0.52
+                    )
+                    .fromTo(
+                        "[data-showroom-anim='cta']",
+                        { autoAlpha: 0, y: 14, scale: 0.96 },
+                        { autoAlpha: 1, y: 0, scale: 1, duration: 0.55, ease: "power3.out" },
+                        0.66
+                    );
+            } else if (mode === "product" && !isTransitioning && isSummaryOpen) {
+                tl.fromTo(
+                    "[data-product-anim='back']",
+                    { autoAlpha: 0, x: -12 },
+                    { autoAlpha: 1, x: 0, duration: 0.4, ease: "power3.out" },
+                    0.05
+                )
+                    .fromTo(
+                        "[data-review-anim='eyebrow']",
+                        { autoAlpha: 0, y: 10 },
+                        { autoAlpha: 1, y: 0, duration: 0.4, ease: "power3.out" },
+                        0.1
+                    )
+                    .fromTo(
+                        "[data-review-anim='line']",
+                        { scaleX: 0, transformOrigin: "left center" },
+                        { scaleX: 1, duration: 0.4, ease: "power3.out" },
+                        0.16
+                    );
+            } else if (mode === "product" && !isTransitioning) {
+                tl.fromTo(
+                    "[data-product-anim='back']",
+                    { autoAlpha: 0, x: -12 },
+                    { autoAlpha: 1, x: 0, duration: 0.4, ease: "power3.out" },
+                    0.05
+                )
+                    .fromTo(
+                        "[data-product-anim='title']",
+                        { autoAlpha: 0, y: -10 },
+                        { autoAlpha: 1, y: 0, duration: 0.45, ease: "power3.out" },
+                        0.1
+                    )
+                    .fromTo(
+                        "[data-product-anim='controls']",
+                        { autoAlpha: 0, y: 14 },
+                        { autoAlpha: 1, y: 0, duration: 0.45, ease: "power3.out" },
+                        0.15
+                    );
+            }
+
+            return () => {
+                tl.kill();
+            };
+        },
+        { scope: overlayRef, dependencies: [mode, isTransitioning, isSummaryOpen] }
+    );
+
+    const handleConfigurePrinter = useCallback(() => {
+        if (!product || isTransitioning) return;
+
+        resetHotspots();
+        closeSummary();
+        initializeConfiguration(product.id);
+        enterProduct(product.id);
+    }, [
+        closeSummary,
+        enterProduct,
+        initializeConfiguration,
+        isTransitioning,
+        product,
+        resetHotspots,
+    ]);
+
+    const handleCtaEnter = useCallback(() => {
+        if (!overlayRef.current) return;
+        const btn = overlayRef.current.querySelector("[data-showroom-anim='cta']");
+        const arrow = overlayRef.current.querySelector("[data-showroom-anim='cta-arrow']");
+
+        if (btn) {
+            gsap.to(btn, {
+                scale: 1.035,
+                duration: 0.25,
+                ease: "power2.out",
+                overwrite: "auto",
+            });
+        }
+        if (arrow) {
+            gsap.to(arrow, {
+                x: 4,
+                duration: 0.25,
+                ease: "power2.out",
+                overwrite: "auto",
+            });
+        }
+    }, []);
+
+    const handleCtaLeave = useCallback(() => {
+        if (!overlayRef.current) return;
+        const btn = overlayRef.current.querySelector("[data-showroom-anim='cta']");
+        const arrow = overlayRef.current.querySelector("[data-showroom-anim='cta-arrow']");
+
+        if (btn) {
+            gsap.to(btn, {
+                scale: 1,
+                duration: 0.25,
+                ease: "power2.out",
+                overwrite: "auto",
+            });
+        }
+        if (arrow) {
+            gsap.to(arrow, {
+                x: 0,
+                duration: 0.25,
+                ease: "power2.out",
+                overwrite: "auto",
+            });
+        }
+    }, []);
 
     async function handleViewInAR() {
         if (!product || isPreparingAR) return;
 
         setIsPreparingAR(true);
-        setARError("");
 
         try {
             const accessoryIds =
@@ -165,94 +311,82 @@ export default function ShowroomOverlay() {
             }
 
             closeConfigurator();
-
             closeSummary();
             resetHotspots();
 
-            router.push(
-                `/ar/${configuration.configurationId}`
-            );
+            router.push(`/ar/${configuration.configurationId}`);
         } catch (error) {
             console.error("AR preparation failed:", error);
-
-            setARError(
-                "Unable to prepare AR. Please check the backend connection and try again."
-            );
         } finally {
             setIsPreparingAR(false);
         }
     }
+
     return (
         <div
-            className="
-                pointer-events-none absolute
-                inset-0 z-10
-            "
+            ref={overlayRef}
+            className="pointer-events-none absolute inset-0 z-10"
         >
-            {/* Common header */}
-            <div className="pointer-events-auto">
-                <Header>
-                    <Navigation />
-                </Header>
-            </div>
-
-            {/* Catalogue toggle */}
-            {mode === "product" && !isTransitioning && (
-                <button
-                    type="button"
-                    onClick={() => {
-                        closeConfigurator();
-                        closeSummary();
-                        resetHotspots();
-                        toggleCatalogue();
-                    }}
-                    aria-expanded={isCatalogueOpen}
-                    className={`
-                        pointer-events-auto absolute
-                        right-5 top-24
-                        flex items-center gap-2
-                        rounded-full border px-5 py-3
-                        text-xs font-medium shadow-sm
-                        transition-colors md:right-12
-                        ${isCatalogueOpen
-                            ? "border-primary bg-primary text-white"
-                            : "border-gray-200 bg-white text-gray-700"
-                        }
-                    `}
+            {/* Common showroom header */}
+            <header
+                data-showroom-anim="header"
+                className="
+                    pointer-events-auto absolute inset-x-0 top-0 z-30
+                    flex items-center justify-between gap-4
+                    px-5 py-5 md:px-12 md:py-6
+                "
+            >
+                <Link
+                    href={APP_CONFIG.routes.home}
+                    className="
+                        select-none text-base font-bold
+                        tracking-[-0.03em] text-[#24282e]
+                        sm:text-lg md:text-[1.35rem]
+                    "
                 >
-                    <LayoutGrid size={17} />
-                    <span>Products</span>
-                </button>
-            )}
+                    <BrandLogo />
+                </Link>
 
-            {/* Showroom overview */}
+                <Navigation />
+            </header>
+
+            {/* Showroom mode overview */}
             {mode === "showroom" &&
                 !isTransitioning &&
                 !isCatalogueOpen && (
                     <section
                         className="
-                            absolute left-5 top-24
-                            max-w-xs md:left-12
-                            md:top-32
+                            absolute left-5 top-24 z-20
+                            max-w-[310px]
+                            md:left-12 md:top-1/2 md:max-w-[350px] md:-translate-y-[52%]
+                            lg:left-16
                         "
                     >
-                        <p
-                            className="
-                                text-[10px] font-semibold
-                                uppercase tracking-[0.25em]
-                                text-primary
-                            "
-                        >
-                            SHARP Virtual Experience
-                        </p>
+                        <div className="inline-block">
+                            <p
+                                data-showroom-anim="eyebrow"
+                                className="
+                                    -mr-[0.18em] text-[11px] font-bold uppercase
+                                    tracking-[0.18em] text-[#d71920]
+                                "
+                            >
+                                VIRTUAL EXPERIENCE
+                            </p>
+
+                            <div
+                                data-showroom-anim="line"
+                                aria-hidden="true"
+                                className="mt-2 h-[2px] w-full bg-[#d71920]"
+                            />
+                        </div>
 
                         <h1
+                            data-showroom-anim="heading"
                             className="
-                                mt-3 text-3xl
-                                font-semibold
-                                leading-tight
-                                text-gray-900
-                                md:text-5xl
+                                mt-4 text-4xl font-extrabold
+                                leading-[1.04] tracking-[-0.03em]
+                                text-[#111c2d]
+                                sm:text-[2.95rem] lg:text-[3.65rem]
                             "
                         >
                             Virtual
@@ -261,53 +395,60 @@ export default function ShowroomOverlay() {
                         </h1>
 
                         <p
+                            data-showroom-anim="subtitle"
                             className="
-                                mt-4 text-sm
-                                leading-relaxed
-                                text-gray-500
+                                mt-4 max-w-[300px] text-sm
+                                leading-[1.65] text-[#4b5563]
+                                md:text-[15.5px]
                             "
                         >
-                            Discover our products
-                            through an immersive
-                            3D experience.
+                            Explore and configure the base model with available accessories.
                         </p>
 
                         <button
+                            data-showroom-anim="cta"
                             type="button"
-                            onClick={openCatalogue}
+                            disabled={!product || isTransitioning}
+                            onClick={handleConfigurePrinter}
+                            onMouseEnter={handleCtaEnter}
+                            onMouseLeave={handleCtaLeave}
+                            style={{
+                                background:
+                                    "linear-gradient(180deg, #e61e25 0%, #c61017 100%)",
+                            }}
                             className="
-                                pointer-events-auto
-                                mt-6 flex items-center
-                                gap-3 rounded-full
-                                bg-primary px-6 py-3
-                                text-sm text-white
-                                hover:bg-primary-hover
+                                pointer-events-auto mt-7
+                                inline-flex items-center gap-3
+                                rounded-full px-7 py-3.5 text-sm font-medium
+                                text-white
+                                shadow-[0_12px_28px_-6px_rgba(224,25,32,0.52)]
+                                transition-shadow hover:shadow-[0_16px_32px_-6px_rgba(224,25,32,0.62)]
+                                disabled:opacity-50
+                                md:mt-8
                             "
                         >
-                            Browse Products
-
-                            <ArrowRight size={17} />
+                            <Settings size={17} strokeWidth={1.9} />
+                            <span>Configure Printer</span>
+                            <span
+                                data-showroom-anim="cta-arrow"
+                                aria-hidden="true"
+                                className="inline-flex items-center"
+                            >
+                                <ArrowRight size={17} strokeWidth={2} />
+                            </span>
                         </button>
-
                     </section>
                 )}
 
-            {/* Product information */}
+            {/* Product Configuration view matching wireframe */}
             {mode === "product" &&
                 product &&
                 !isTransitioning &&
                 !isCatalogueOpen && (
-                    <section
-                        className="
-                            pointer-events-none absolute
-                            left-5 top-24 z-20
-                            flex max-w-xs flex-col
-                            items-start gap-5
-                            md:left-12 md:top-28
-                        "
-                    >
-                        {/* Back button */}
+                    <>
+                        {/* Back to Showroom pill */}
                         <button
+                            data-product-anim="back"
                             type="button"
                             onClick={() => {
                                 closeConfigurator();
@@ -316,233 +457,151 @@ export default function ShowroomOverlay() {
                                 returnToShowroom();
                             }}
                             className="
-                                pointer-events-auto
+                                pointer-events-auto absolute
+                                left-5 top-20 z-20
                                 flex items-center gap-2
-                                rounded-full border border-gray-200
+                                rounded-full border border-gray-100
                                 bg-white/95 px-4 py-2
-                                text-xs font-medium
-                                text-gray-600 shadow-sm
-                                hover:bg-gray-100
+                                text-xs font-medium text-gray-700
+                                shadow-[0_6px_18px_rgba(15,23,42,0.08)]
+                                transition-colors hover:bg-gray-50
+                                md:left-12
                             "
                         >
-                            <ArrowLeft size={15} />
-                            Back to Showroom
+                            <ArrowLeft size={14} strokeWidth={2} />
+                            <span>Back to Showroom</span>
                         </button>
 
-
-                        {/* Product details */}
-                        <ProductDetails product={product} />
-
-                        {/* Configuration button */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                resetHotspots();
-                                closeSummary();
-                                if (isConfiguratorOpen) {
-                                    closeConfigurator();
-                                } else {
-                                    initializeConfiguration(product.id);
-                                }
-                            }}
-                            className="
-                                pointer-events-auto
-                                flex items-center gap-3
-                                rounded-full bg-primary
-                                px-6 py-3 text-sm font-medium
-                                text-white shadow-sm
-                                hover:bg-primary-hover
-                            "
-                        >
-                            <Settings2 size={18} />
-
-                            {isConfiguratorOpen
-                                ? "Close Configuration"
-                                : "Configure Product"}
-                        </button>
-
-                        <button
-                            type="button"
-                            aria-expanded={isSummaryOpen}
-                            onClick={() => {
-                                resetHotspots();
-
-                                if (isSummaryOpen) {
-                                    closeSummary();
-                                } else {
-                                    openSummary();
-                                }
-                            }}
-                            className={`
-                                pointer-events-auto
-                                flex items-center gap-3
-                                rounded-full border px-6 py-3
-                                text-sm font-medium shadow-sm
-                                transition-colors
-                                ${isSummaryOpen
-                                    ? "border-primary bg-primary text-white"
-                                    : "border-gray-200 bg-white text-gray-700 hover:border-primary hover:text-primary"
-                                }
-                            `}
-                        >
-                            <ClipboardList size={18} />
-
-                            {isSummaryOpen
-                                ? "Close Summary"
-                                : "Review Configuration"}
-                        </button>
-
-                        {/* Hotspot visibility toggle */}
-                        {product.id === "base-tu11" && (
-                            <button
-                                type="button"
-                                aria-pressed={Boolean(showHotspots)}
-                                onClick={() => {
-                                    closeConfigurator();
-                                    closeSummary();
-                                    toggleHotspots();
-                                }}
-                                className={`
-                                    pointer-events-auto
-                                    flex items-center gap-3
-                                    rounded-full border px-6 py-3
-                                    text-sm font-medium shadow-sm
-                                    transition-colors
-                                    ${showHotspots
-                                        ? "border-primary bg-primary text-white"
-                                        : "border-gray-200 bg-white text-gray-700 hover:border-primary hover:text-primary"
-                                    }
-                                `}
+                        {/* Review Configuration left eyebrow */}
+                        {isSummaryOpen && (
+                            <section
+                                className="
+                                    pointer-events-none absolute
+                                    left-5 top-32 z-20
+                                    md:left-12 md:top-32
+                                "
                             >
-                                <Scan size={18} />
-                                {showHotspots ? "Hide Hotspots" : "Show Hotspots"}
-                            </button>
-                        )}
+                                <div className="inline-block">
+                                    <p
+                                        data-review-anim="eyebrow"
+                                        className="
+                                            -mr-[0.14em] text-[11px] font-bold uppercase
+                                            tracking-[0.14em] text-[#d71920]
+                                        "
+                                    >
+                                        REVIEW CONFIGURATION
+                                    </p>
 
-                        {/* View in AR */}
-                        {product.id === "base-tu11" && (
-                            <button
-                                type="button"
-                                onClick={handleViewInAR}
-                                disabled={isPreparingAR}
-                                className="pointer-events-auto flex items-center gap-3 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
-                            >
-                                {isPreparingAR ? (
-                                    <LoaderCircle
-                                        size={18}
-                                        className="animate-spin"
+                                    <div
+                                        data-review-anim="line"
+                                        aria-hidden="true"
+                                        className="mt-1.5 h-[2px] w-full bg-[#d71920]"
                                     />
-                                ) : (
-                                    <Smartphone size={18} />
-                                )}
-
-                                {isPreparingAR
-                                    ? "Preparing AR..."
-                                    : "View in AR"}
-                            </button>
+                                </div>
+                            </section>
                         )}
 
-                        {arError && (
-                            <p
-                                role="alert"
-                                className="max-w-xs text-xs text-red-600"
+                        {/* Centered left-stage title & bottom controls */}
+                        {!isSummaryOpen && (
+                            <div
+                                className="
+                                    pointer-events-none absolute inset-y-0 left-0 z-20
+                                    flex w-full flex-col items-center justify-between
+                                    pb-[47dvh] pt-28
+                                    md:w-[calc(100%-430px)] md:pb-6 md:pt-[15vh]
+                                    lg:w-[calc(100%-480px)]
+                                "
                             >
-                                {arError}
-                            </p>
+                                <h1
+                                    data-product-anim="title"
+                                    className="
+                                        text-center text-lg font-bold
+                                        tracking-tight text-[#152336]
+                                        md:text-[1.45rem]
+                                    "
+                                >
+                                    {product.name}
+                                </h1>
+
+                                <div
+                                    data-product-anim="controls"
+                                    className="
+                                        pointer-events-auto flex
+                                        flex-col items-center gap-2 md:gap-3
+                                    "
+                                >
+                                    <div className="flex items-center gap-2 md:gap-3">
+                                        <ProductControlButton
+                                            icon={Rotate3D}
+                                            label="Rotate"
+                                            onClick={toggleAutoRotate}
+                                            active={autoRotate}
+                                            pressed={autoRotate}
+                                        />
+                                        <ProductControlButton
+                                            icon={ZoomIn}
+                                            label="Zoom In"
+                                            onClick={zoomIn}
+                                        />
+                                        <ProductControlButton
+                                            icon={ZoomOut}
+                                            label="Zoom Out"
+                                            onClick={zoomOut}
+                                        />
+                                        <ProductControlButton
+                                            icon={RotateCcw}
+                                            label="Reset"
+                                            onClick={resetCamera}
+                                        />
+                                    </div>
+
+                                    <div
+                                        className="
+                                            hidden items-center gap-2
+                                            rounded-full border border-gray-100
+                                            bg-white/95 px-5 py-2
+                                            text-xs text-gray-600
+                                            shadow-[0_6px_18px_rgba(15,23,42,0.07)]
+                                            md:flex
+                                        "
+                                    >
+                                        <MousePointer2 size={14} />
+                                        <span>Drag to rotate · Scroll to zoom</span>
+                                    </div>
+                                </div>
+                            </div>
                         )}
-                    </section>
+                    </>
                 )}
 
-
-            {/* Camera controls */}
-            {mode === "product" &&
-                product &&
-                !isTransitioning &&
-                !isConfiguratorOpen &&
-                !isCatalogueOpen &&
-                !selectedHotspot &&
-                !isSummaryOpen && (
-                    <div
-                        className="
-                            pointer-events-auto absolute
-                            right-5 top-1/2 flex
-                            -translate-y-1/2
-                            flex-col gap-2
-                            md:right-12
-                        "
-                    >
-                        <ControlButton
-                            icon={ZoomIn}
-                            label="Zoom In"
-                            onClick={zoomIn}
-                        />
-
-                        <ControlButton
-                            icon={ZoomOut}
-                            label="Zoom Out"
-                            onClick={zoomOut}
-                        />
-
-                        <ControlButton
-                            icon={Rotate3D}
-                            label="Auto Rotate"
-                            onClick={toggleAutoRotate}
-                            active={autoRotate}
-                            pressed={autoRotate}
-                        />
-
-                        <ControlButton
-                            icon={RotateCcw}
-                            label="Reset Camera"
-                            onClick={resetCamera}
-                        />
-                    </div>
-                )}
-
-            {/* Bottom instruction */}
-            {!isCatalogueOpen && (
+            {/* Transition status pill */}
+            {isTransitioning && (
                 <div
-                    role={isTransitioning ? "status" : undefined}
+                    role="status"
                     className="
                         absolute bottom-8 left-1/2
                         flex -translate-x-1/2
                         items-center gap-2
                         whitespace-nowrap
-                        rounded-full bg-white/90
+                        rounded-full bg-white/95
                         px-5 py-3 text-xs
-                        text-gray-500 shadow-sm
+                        text-gray-600 shadow-sm
                     "
                 >
-                    {isTransitioning ? (
-                        mode === "product"
-                            ? "Moving to product..."
-                            : "Returning to showroom..."
-                    ) : mode === "product" ? (
-                        <>
-                            <MousePointer2 size={15} />
-
-                            <span className="hidden md:inline">
-                                Drag to rotate · Scroll to zoom
-                            </span>
-
-                            <span className="md:hidden">
-                                Drag to rotate · Pinch to zoom
-                            </span>
-                        </>
-                    ) : (
-                        "Select a product to explore"
-                    )}
+                    {mode === "product"
+                        ? "Moving to product..."
+                        : "Returning to showroom..."}
                 </div>
             )}
 
             {/* Floating catalogue panel */}
             <ProductList />
 
+            {/* Right-side Configure Printer panel */}
             {mode === "product" &&
                 product &&
                 !isTransitioning &&
                 !isCatalogueOpen &&
-                isConfiguratorOpen &&
                 !isSummaryOpen && (
                     <ConfiguratorPanel product={product} />
                 )}
@@ -552,8 +611,7 @@ export default function ShowroomOverlay() {
                 product &&
                 isSummaryOpen &&
                 !isTransitioning &&
-                !isCatalogueOpen &&
-                !isConfiguratorOpen && (
+                !isCatalogueOpen && (
                     <ConfigurationSummary
                         key={product.id}
                         product={product}
@@ -564,12 +622,12 @@ export default function ShowroomOverlay() {
 
             {/* Hotspot details panel */}
             {mode === "product" &&
-                product?.id === "base-tu11" &&
+                (product?.supportsHotspots ||
+                    product?.id === APP_CONFIG.defaultProductId) &&
                 showHotspots &&
                 selectedHotspot &&
                 !isTransitioning &&
                 !isCatalogueOpen &&
-                !isConfiguratorOpen &&
                 !isSummaryOpen && (
                     <HotspotDetails />
                 )}

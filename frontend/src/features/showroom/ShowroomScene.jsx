@@ -11,6 +11,8 @@ import { useConfiguration } from
     "@/hooks/useConfiguration";
 
 import Lighting from "@/components/three/Lighting";
+import ProductStudioLighting from "@/components/three/ProductStudioLighting";
+import IsolatedLightingRenderer from "@/components/three/IsolatedLightingRenderer";
 import CameraControls from "@/components/three/CameraControls";
 import SceneLoader from "@/components/three/SceneLoader";
 
@@ -160,6 +162,10 @@ export default function ShowroomScene() {
     return (
         <>
             <Lighting />
+
+            <ProductStudioLighting position={[0, 0, 0]} />
+
+            <IsolatedLightingRenderer />
 
             <CameraControls />
 

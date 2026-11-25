@@ -7,8 +7,22 @@ export const useShowroomStore = create((set) => ({
     autoRotate: false,
     cameraCommand: null,
     showHotspots: false,
-
     selectedHotspot: null,
+    assemblySize: [0.59, 0.81, 0.64],
+
+    setAssemblySize: (size) =>
+        set((state) => {
+            if (!Array.isArray(size) || size.length !== 3) return state;
+            const prev = state.assemblySize;
+            if (
+                Math.abs(prev[0] - size[0]) < 0.005 &&
+                Math.abs(prev[1] - size[1]) < 0.005 &&
+                Math.abs(prev[2] - size[2]) < 0.005
+            ) {
+                return state;
+            }
+            return { assemblySize: size };
+        }),
 
     toggleHotspots: () =>
         set((state) => ({
@@ -50,14 +64,9 @@ export const useShowroomStore = create((set) => ({
 
             return {
                 mode: "product",
-
                 selectedProduct: productId,
-
-                isTransitioning:
-                    isEnteringShowroomProduct,
-
+                isTransitioning: isEnteringShowroomProduct,
                 autoRotate: false,
-
                 cameraCommand: null,
             };
         }),
@@ -94,6 +103,7 @@ export const useShowroomStore = create((set) => ({
         set({
             cameraCommand: {
                 type: "zoomIn",
+                timestamp: Date.now(),
             },
         }),
 
@@ -101,6 +111,7 @@ export const useShowroomStore = create((set) => ({
         set({
             cameraCommand: {
                 type: "zoomOut",
+                timestamp: Date.now(),
             },
         }),
 
@@ -109,6 +120,7 @@ export const useShowroomStore = create((set) => ({
             autoRotate: false,
             cameraCommand: {
                 type: "reset",
+                timestamp: Date.now(),
             },
         }),
 }));

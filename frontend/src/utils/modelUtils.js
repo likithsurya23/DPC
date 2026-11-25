@@ -1,5 +1,16 @@
 import * as THREE from "three";
 
+export const ENVIRONMENT_LAYER = 0;
+export const PRODUCT_LAYER = 1;
+
+export function setObjectLayer(object, layer = PRODUCT_LAYER) {
+    if (!object) return;
+    object.layers.set(layer);
+    object.traverse((child) => {
+        child.layers.set(layer);
+    });
+}
+
 export function prepareModel(scene) {
     const model = scene.clone(true);
 
