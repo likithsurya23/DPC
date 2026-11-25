@@ -1,42 +1,81 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { envConfig } from "./config/env.js";
 import arRoutes from "./routes/arRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
-
-dotenv.config();
 
 const app = express();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function isOriginAllowed(origin) {
+    if (!origin) return true;
+
+    const normalized = origin.replace(/\/+$/, "");
+    if (envConfig.allowedOrigins.includes(normalized)) {
+        return true;
+    }
+
+    if (envConfig.allowLocalOrigins) {
+        try {
+            const { hostname } = new URL(normalized);
+            if (
+                hostname === "localhost" ||
+                hostname === "127.0.0.1" ||
+                hostname === "::1"
+            ) {
+                return true;
+            }
+        } catch {
+            return false;
+        }
+    }
+
+    return envConfig.allowedOrigins.length === 0;
+}
+
 app.use(
     cors({
-        origin:
-            process.env.FRONTEND_URL || "http://localhost:3000",
+        origin: (origin, callback) => {
+            if (isOriginAllowed(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error(`Origin not allowed by CORS: ${origin}`));
+            }
+        },
     })
 );
 
 app.use(express.json());
 
-// Serve GLB models and other assets
+// Serve GLB/USDZ models and other assets with explicit AR MIME types
 app.use(
-    "/assets",
-    express.static(path.join(__dirname, "../assets"))
+    envConfig.assetsRoute,
+    express.static(path.join(__dirname, "../assets"), {
+        setHeaders(res, filePath) {
+            if (filePath.endsWith(".usdz")) {
+                res.setHeader("Content-Type", "model/vnd.usdz+zip");
+            } else if (filePath.endsWith(".glb")) {
+                res.setHeader("Content-Type", "model/gltf-binary");
+            }
+        },
+    })
 );
 
 // Health check
-app.get("/api/v1/health", (req, res) => {
+app.get(`${envConfig.apiPrefix}/health`, (req, res) => {
     res.json({
         success: true,
         message: "DPC Backend is running",
     });
 });
 
-// Product routes
-app.use("/api/v1/products", productRoutes);
-app.use("/api/v1/ar", arRoutes);
+// Product & AR routes
+app.use(`${envConfig.apiPrefix}/products`, productRoutes);
+app.use(`${envConfig.apiPrefix}/ar`, arRoutes);
+
 export default app;

@@ -18,7 +18,8 @@ function subscribe() {
 
 function getClientSnapshot() {
     if (!clientSnapshot) {
-        const userAgent = navigator.userAgent;
+        const userAgent = navigator.userAgent || "";
+        const isUADataMobile = Boolean(navigator.userAgentData?.mobile);
         const isAndroid = /Android/i.test(userAgent);
         const isIOS =
             /iPhone|iPad|iPod/i.test(userAgent) ||
@@ -28,7 +29,7 @@ function getClientSnapshot() {
             );
 
         clientSnapshot = {
-            isMobile: isAndroid || isIOS,
+            isMobile: isAndroid || isIOS || isUADataMobile,
             isAndroid,
             isIOS,
             isSecureContext: window.isSecureContext,
